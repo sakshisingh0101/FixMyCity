@@ -31,12 +31,11 @@ const userSchema =new  mongoose.Schema({
     required:true
   },
   phoneNumber:{
-     type:Number,
+     type:String,
      unique:true
   },
   refreshToken:{
-    type:String,
-    required:true
+    type:String
   }
 },{timestamps:true})
 userSchema.pre("save", async function(next) {

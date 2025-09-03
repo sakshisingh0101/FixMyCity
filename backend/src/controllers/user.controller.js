@@ -2,6 +2,7 @@ import { User } from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import jwt from "jsonwebtoken"
 const generateTokens=async(userId)=>{
   const user = await User.findById(userId);
   const accessToken =  user.generateAccessToken();
@@ -18,15 +19,15 @@ const registerUser = asyncHandler(async(req,res)=>{
     {
         throw new ApiError(400,"All the fields are required");
     }
-     if(email===""&&!phoneNumber)
+     if(email===""&&phoneNumber==="")
     {
          throw new ApiError(401,"User must enter email or phone number")
     }
     
-    if(phoneNumber&&isNaN(phoneNumber))
-    {
-        throw new ApiError(401,"Enter a valid number")
+    if (phoneNumber.length !== 10) {
+    throw new ApiError(401,"Invalid phone number : must be of 10 digit")
     }
+    
     if(email&&!email.includes('@'))
     {
       throw new ApiError(400,"Invalid email");
@@ -45,7 +46,7 @@ const registerUser = asyncHandler(async(req,res)=>{
         email:email?.trim()==="" ? "": email,
         password,
         role,
-        phoneNumber: phoneNumber? phoneNumber : undefined
+        phoneNumber: phoneNumber? phoneNumber : ""
     })
     // const {accessToken,refreshToken}= generateTokens(user._id)
     const finaluser = await User.findById(user._id).select(
@@ -63,11 +64,13 @@ const registerUser = asyncHandler(async(req,res)=>{
     return res
     .status(200)
     .json(new ApiResponse(200,"Successfully registerd",{
-        data:finaluser,refreshToken,accessToken
+        finaluser
     }))
 
 })
 const loginUser = asyncHandler(async(req,res)=>{
+    console.log("BODY ===>", req.body);
+
     const {userName,email,password}= req.body
     if([userName,email,password].some((field)=>field?.trim()==="")){
         throw new ApiError(401,"All the fields are required")
@@ -127,26 +130,33 @@ res.status(200)
 })
 
 const updateUserProfile=asyncHandler(async(req,res)=>{
+    console.log(req.body)
     const {userName,email,phoneNumber} = req.body
+    
     // if([userName,email,phoneNumber].some((field)=>(field?.trim()==="")))
     // {
     //     throw new ApiError(401,"Fields must not be empty")
     // }
+    if(email===""&&phoneNumber==="")
+    {
+         throw new ApiError(401,"User must enter email or phone number")
+    }
+    
+    if (phoneNumber.length !== 10) {
+    throw new ApiError(401,"Invalid phone number : must be of 10 digit")
+    }
     if(userName.trim()==="")
     {
         throw new ApiError(401,"Username cannot be empty")
     }
+    
     const user= await User.findOne({userName})
     
     if (user && user._id.toString() !== req.user._id.toString()) {
     throw new ApiError(401, "Username already taken");
    }
 
-   if(phoneNumber&&isNaN(phoneNumber))
-   {
-       throw new ApiError(401,"Invalid phone number")
-   }
-    
+   
 
   const existedUser = await User.findById(req.user._id);
 
@@ -154,7 +164,7 @@ existedUser.userName = userName.trim();
 existedUser.email = email?.trim() ? email.trim() : existedUser.email;
 existedUser.phoneNumber = phoneNumber ? phoneNumber : existedUser.phoneNumber;
 
-await existedUser.save();
+await existedUser.save({validateBeforeSave:false});
 
 
   return res.status(200).json(new ApiResponse(200,"Successfully profile updated",existedUser))
@@ -169,19 +179,27 @@ const updatePassword=asyncHandler(async(req,res)=>{
     {
         throw new ApiError(401,"Fields must not be empty")
     }
-    const user =req.user;
-    const iscorrect = await user.isPassword(currentPassword)
-    if(!iscorrect)
-    {
-        throw new ApiError(401,"Incorrect current password")
-    }
-    const currentUser= await User.findById(user._id)
+    // const user =req.user;
+    const currentUser= await User.findById(req.user._id)
     if(!currentUser)
     {
         throw new ApiError(401,"User not exist")
     }
+    const iscorrect = await currentUser.isPassword(currentPassword)
+
+    if(!iscorrect)
+    {
+        throw new ApiError(401,"Incorrect current password")
+    }
+    // const currentUser= await User.findById(currentUser._id)
+    // if(!currentUser)
+    // {
+    //     throw new ApiError(401,"User not exist")
+    // }
     currentUser.password= newPassword
    await currentUser.save({validateBeforeSave:false})
+   const finaluser= await User.findById(currentUser._id)
+   res.status(200).json(new ApiResponse(200,"Successfully password updated",finaluser))
 
 })
 
@@ -212,6 +230,7 @@ const isUserLogin = asyncHandler(async(req,res)=>{
     } catch (error) {
         throw new ApiError(401, "Invalid or Expired Token");
     }
+     
 
         
         
@@ -222,7 +241,7 @@ const getUserDetails= asyncHandler(async(req,res)=>{
     {
         throw new ApiError(500,"User not found")
     }
-    return res.status(200).json(200,"User details fetched",user)
+    return res.status(200).json(new ApiResponse(200,"User details fetched",user))
 
 })
 const refreshAccessToken=asyncHandler(async(req,res)=>{
@@ -247,7 +266,7 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
  
  
  
-     const {accessToken,refreshToken}=await generateAccessAndRefreshToken(user._id);
+     const {accessToken,refreshToken}=await generateTokens(user._id);
      const option={
          httpOnly:true,
          server:false
