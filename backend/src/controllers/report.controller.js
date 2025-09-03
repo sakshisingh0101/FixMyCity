@@ -133,11 +133,11 @@ const getAllMyReport=asyncHandler(async(req,res)=>{
     
 })
 const updateReport=asyncHandler(async(req,res)=>{
-    const { id } = req.params;
+    const { reportId } = req.params;
     const userId = req.user._id; // from auth middleware
     const { title, description, category } = req.body;
 
-    let report = await Report.findById(id);
+    let report = await Report.findById(reportId);
     if (!report) {
       throw new ApiError(401,"Report not found")
     }
@@ -149,7 +149,7 @@ const updateReport=asyncHandler(async(req,res)=>{
     if (title) report.title = title;
     if (description) report.description = description;
     if (category) report.category = category;
-    if (req.file) report.image = req.file.path; // multer field
+    if (req.files) report.reportImage = req.files.reportImage[0].path; // multer field
 
     await report.save();
     res.json(report);
@@ -177,4 +177,6 @@ const deleteReport = asyncHandler(async(req,res)=>{
     }
     return res.status(200).json(new ApiResponse(200,"Successfully deleted report",deleterepo))
 })
+
+//status update access bt only admin 
 export {uploadReport,upvote,getAllMyReport,getAllReports,removeUpvote,deleteReport,updateReport}

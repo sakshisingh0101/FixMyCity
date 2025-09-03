@@ -239,7 +239,7 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
          throw new ApiError(401," Invalid token : user does not match ")
  
      }
-     if(user.refreshToken!==Token)
+     if(user.refreshToken!==Token)  //equal check 
      {   throw new ApiError(401," Invalid refresh Token")
  
  
